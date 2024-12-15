@@ -1,0 +1,76 @@
+const { ethers } = require('ethers');
+
+// Define provider (Infura, Alchemy, or local node)
+const provider = new ethers.JsonRpcProvider('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID');
+
+// Define signer (owner private key or wallet)
+const privateKey = 'YOUR_PRIVATE_KEY'; // This is for a wallet that controls one of the owners
+const wallet = new ethers.Wallet(privateKey, provider);
+
+// Multisig wallet contract details
+const contractAddress = '0xYourMultisigWalletAddress';
+const contractABI = [
+    "function submitTransaction(address destination, uint256 value, bytes data) public returns (uint256)",
+    "function confirmTransaction(uint256 transactionId) public",
+    "function executeTransaction(uint256 transactionId) public",
+    "function getTransactionCount(bool pending) public view returns (uint256 count)",
+    "function getTransaction(uint256 transactionId) public view returns (address destination, uint256 value, bytes data, bool executed, uint256 confirmations)"
+];
+
+// Create a contract instance
+const multisigWallet = new ethers.Contract(contractAddress, contractABI, wallet);
+
+// Propose a new transaction (submit a transaction)
+async function submitTransaction(destination, value, data) {
+    const tx = await multisigWallet.submitTransaction(destination, value, data);
+    console.log('Transaction submitted, awaiting confirmation...', tx.hash);
+    await tx.wait();  // Wait for the transaction to be mined
+    console.log('Transaction submitted successfully.');
+}
+
+// Confirm a transaction (for a specific transactionId)
+async function confirmTransaction(transactionId) {
+    const tx = await multisigWallet.confirmTransaction(transactionId);
+    console.log('Transaction confirmed by this signer', tx.hash);
+    await tx.wait();  // Wait for the transaction to be mined
+    console.log('Transaction confirmed.');
+}
+
+// Execute a transaction (after enough confirmations)
+async function executeTransaction(transactionId) {
+    const tx = await multisigWallet.executeTransaction(transactionId);
+    console.log('Transaction executed', tx.hash);
+    await tx.wait();  // Wait for the transaction to be mined
+    console.log('Transaction executed successfully.');
+}
+
+// Get the number of confirmations required for a transaction
+async function getTransactionDetails(transactionId) {
+    const details = await multisigWallet.getTransaction(transactionId);
+    console.log(`Transaction details: Destination: ${details[0]}, Value: ${ethers.utils.formatEther(details[1])} ETH, Executed: ${details[3]}`);
+}
+
+// Example of proposing a new transaction, confirming, and executing it
+async function main() {
+    const destinationAddress = '0xRecipientAddress'; // Address to send funds to
+    const transactionValue = ethers.utils.parseEther('1'); // Amount to send in ETH
+    const data = '0x'; // Additional data, can be empty for simple ETH transfers
+
+    try {
+        await submitTransaction(destinationAddress, transactionValue, data);
+
+        // Assuming the transactionId is 0 for simplicity; in a real-world scenario, you'd need to track transactionIds dynamically.
+        const transactionId = 0;
+
+        await confirmTransaction(transactionId);
+
+        // After sufficient confirmations, execute the transaction
+        await executeTransaction(transactionId);
+
+    } catch (error) {
+        console.error('Error interacting with multisig wallet:', error);
+    }
+}
+
+// Run the example
+main();
